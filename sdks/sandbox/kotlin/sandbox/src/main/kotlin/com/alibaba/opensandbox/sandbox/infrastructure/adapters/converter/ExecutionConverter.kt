@@ -19,16 +19,33 @@ package com.alibaba.opensandbox.sandbox.infrastructure.adapters.converter
 import com.alibaba.opensandbox.sandbox.domain.models.execd.executions.CommandStatus
 import com.alibaba.opensandbox.sandbox.domain.models.execd.executions.RunCommandRequest
 import com.alibaba.opensandbox.sandbox.api.models.execd.CommandStatusResponse as ApiCommandStatusResponse
-import com.alibaba.opensandbox.sandbox.api.models.execd.RunCommandRequest as ApiRunCommandRequest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 object ExecutionConverter {
-    fun RunCommandRequest.toApiRunCommandRequest(): ApiRunCommandRequest {
-        return ApiRunCommandRequest(
-            command = command,
-            background = background,
-            cwd = workingDirectory,
-            timeout = timeout?.inWholeMilliseconds,
-        )
+    fun RunCommandRequest.toApiRunCommandPayload(): JsonObject {
+        return buildJsonObject {
+            put("command", JsonPrimitive(command))
+            if (background) {
+                put("background", JsonPrimitive(background))
+            }
+            workingDirectory?.let { put("cwd", JsonPrimitive(it)) }
+            timeout?.let { put("timeout", JsonPrimitive(it.inWholeMilliseconds)) }
+            uid?.let { put("uid", JsonPrimitive(it)) }
+            gid?.let { put("gid", JsonPrimitive(it)) }
+            if (envs.isNotEmpty()) {
+                put(
+                    "envs",
+                    buildJsonObject {
+                        envs.forEach { (key, value) ->
+                            put(key, JsonPrimitive(value))
+                        }
+                    },
+                )
+            }
+        }
     }
 
     fun ApiCommandStatusResponse.toCommandStatus(): CommandStatus {

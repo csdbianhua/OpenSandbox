@@ -813,6 +813,53 @@ public class SandboxE2ETest extends BaseE2ETest {
         assertTrue(completedEvents.isEmpty(), "Failing command should not emit completion event");
     }
 
+    @Test
+    @Order(4)
+    @DisplayName("Command execution with env injection")
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void testRunCommandWithEnvInjection() {
+        assertNotNull(sandbox);
+
+        String envKey = "OPEN_SANDBOX_E2E_CMD_ENV";
+        String envValue = "env-ok-" + System.currentTimeMillis();
+        String probeCommand =
+                "sh -c 'if [ -z \"${"
+                        + envKey
+                        + "-}\" ]; then echo \"__EMPTY__\"; else echo \"${"
+                        + envKey
+                        + "}\"; fi'";
+
+        // Baseline: variable should be empty when not injected.
+        Execution baseline =
+                sandbox.commands().run(RunCommandRequest.builder().command(probeCommand).build());
+        assertNotNull(baseline);
+        assertNull(baseline.getError());
+        String baselineOutput =
+                baseline.getLogs().getStdout().stream()
+                        .map(OutputMessage::getText)
+                        .reduce("", (a, b) -> a.isEmpty() ? b : a + "\n" + b)
+                        .trim();
+        assertEquals("__EMPTY__", baselineOutput);
+
+        // Inject env vars for this command and verify visibility.
+        Execution injected =
+                sandbox.commands()
+                        .run(
+                                RunCommandRequest.builder()
+                                        .command(probeCommand)
+                                        .env(envKey, envValue)
+                                        .env("OPEN_SANDBOX_E2E_SECOND_ENV", "second-ok")
+                                        .build());
+        assertNotNull(injected);
+        assertNull(injected.getError());
+        String injectedOutput =
+                injected.getLogs().getStdout().stream()
+                        .map(OutputMessage::getText)
+                        .reduce("", (a, b) -> a.isEmpty() ? b : a + "\n" + b)
+                        .trim();
+        assertEquals(envValue, injectedOutput);
+    }
+
     // ==========================================
     // Filesystem Operations Tests
     // ==========================================

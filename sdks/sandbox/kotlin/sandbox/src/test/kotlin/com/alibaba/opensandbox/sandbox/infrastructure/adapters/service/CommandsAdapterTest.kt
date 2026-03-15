@@ -21,6 +21,11 @@ import com.alibaba.opensandbox.sandbox.config.ConnectionConfig
 import com.alibaba.opensandbox.sandbox.domain.models.execd.executions.ExecutionHandlers
 import com.alibaba.opensandbox.sandbox.domain.models.execd.executions.RunCommandRequest
 import com.alibaba.opensandbox.sandbox.domain.models.sandboxes.SandboxEndpoint
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -28,6 +33,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -41,7 +47,6 @@ class CommandsAdapterTest {
         mockWebServer = MockWebServer()
         mockWebServer.start()
 
-        val baseUrl = mockWebServer.url("/").toString()
         // We need to parse the port from MockWebServer to simulate the Execd endpoint
         val host = mockWebServer.hostName
         val port = mockWebServer.port
@@ -93,6 +98,10 @@ class CommandsAdapterTest {
         val request =
             RunCommandRequest.builder()
                 .command("echo Hello")
+                .uid(1000)
+                .gid(1000)
+                .env("APP_ENV", "test")
+                .env("LOG_LEVEL", "debug")
                 .handlers(handlers)
                 .build()
 
@@ -105,5 +114,23 @@ class CommandsAdapterTest {
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/command", recordedRequest.path)
         assertEquals("POST", recordedRequest.method)
+        val requestBodyJson = Json.parseToJsonElement(recordedRequest.body.readUtf8()).jsonObject
+        assertEquals("echo Hello", requestBodyJson["command"]?.jsonPrimitive?.content)
+        assertEquals(1000, requestBodyJson["uid"]?.jsonPrimitive?.intOrNull)
+        assertEquals(1000, requestBodyJson["gid"]?.jsonPrimitive?.intOrNull)
+        val envs = requestBodyJson["envs"]?.jsonObject
+        assertEquals("test", envs?.get("APP_ENV")?.jsonPrimitive?.content)
+        assertEquals("debug", envs?.get("LOG_LEVEL")?.jsonPrimitive?.content)
+        assertEquals(null, requestBodyJson["background"]?.jsonPrimitive?.booleanOrNull)
+    }
+
+    @Test
+    fun `run command builder should require uid when gid is provided`() {
+        assertThrows<IllegalArgumentException> {
+            RunCommandRequest.builder()
+                .command("id")
+                .gid(1000)
+                .build()
+        }
     }
 }

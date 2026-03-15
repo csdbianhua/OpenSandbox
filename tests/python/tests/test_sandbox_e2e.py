@@ -825,16 +825,20 @@ class TestSandboxE2E:
 
         env_key = "OPEN_SANDBOX_E2E_CMD_ENV"
         env_value = f"env-ok-{int(time.time())}"
+        probe_command = (
+            f"sh -c 'if [ -z \"${{{env_key}:-}}\" ]; then echo \"__EMPTY__\"; "
+            f"else echo \"${{{env_key}}}\"; fi'"
+        )
 
         # Baseline: variable should be empty when not injected.
-        baseline = await sandbox.commands.run(f"sh -c 'echo -n \"${{{env_key}}}\"'")
+        baseline = await sandbox.commands.run(probe_command)
         assert baseline.error is None
-        assert len(baseline.logs.stdout) == 1
-        assert baseline.logs.stdout[0].text == ""
+        baseline_output = "\n".join(msg.text for msg in baseline.logs.stdout).strip()
+        assert baseline_output == "__EMPTY__"
 
         # Inject environment variables for this command only.
         injected = await sandbox.commands.run(
-            f"sh -c 'echo -n \"${{{env_key}}}\"'",
+            probe_command,
             opts=RunCommandOpts(
                 envs={
                     env_key: env_value,
@@ -843,8 +847,8 @@ class TestSandboxE2E:
             ),
         )
         assert injected.error is None
-        assert len(injected.logs.stdout) == 1
-        assert injected.logs.stdout[0].text == env_value
+        injected_output = "\n".join(msg.text for msg in injected.logs.stdout).strip()
+        assert injected_output == env_value
 
     @pytest.mark.timeout(120)
     @pytest.mark.order(4)
