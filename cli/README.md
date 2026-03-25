@@ -190,6 +190,38 @@ Shortcut for `osb command run`. Everything after `--` is passed as the command.
 | `context`   | Manage code execution contexts            |
 | `interrupt` | Interrupt a running code execution        |
 
+### `osb devops` — DevOps Diagnostics
+
+| Command   | Description                                          |
+| --------- | ---------------------------------------------------- |
+| `logs`    | Retrieve container/pod logs                          |
+| `inspect` | Retrieve detailed container/pod inspection info      |
+| `events`  | Retrieve events related to a sandbox                 |
+| `summary` | One-shot diagnostics: inspect + events + logs combined |
+
+```bash
+# Quick diagnostics summary
+osb devops summary <sandbox-id>
+
+# Get last 500 log lines
+osb devops logs <sandbox-id> --tail 500
+
+# Get logs from the last 30 minutes
+osb devops logs <sandbox-id> --since 30m
+
+# Detailed container/pod inspection
+osb devops inspect <sandbox-id>
+
+# View events (up to 100)
+osb devops events <sandbox-id> --limit 100
+```
+
+All devops commands return plain text output, making them ideal for both human reading and AI agent consumption.
+
+![DevOps Summary 1](assets/cli_devops_summary_1.png)
+
+![DevOps Summary 2](assets/cli_devops_summary_2.png)
+
 ### `osb config` — Configuration
 
 | Command | Description                                |

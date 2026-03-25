@@ -26,6 +26,7 @@ from opensandbox_cli.client import ClientContext
 from opensandbox_cli.commands.code import code_group
 from opensandbox_cli.commands.command import command_group, exec_cmd
 from opensandbox_cli.commands.config_cmd import config_group
+from opensandbox_cli.commands.devops import devops_group
 from opensandbox_cli.commands.file import file_group
 from opensandbox_cli.commands.sandbox import sandbox_group
 from opensandbox_cli.config import resolve_config
@@ -109,3 +110,4 @@ cli.add_command(exec_cmd)
 cli.add_command(file_group)
 cli.add_command(code_group)
 cli.add_command(config_group)
+cli.add_command(devops_group)
