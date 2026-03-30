@@ -166,7 +166,7 @@ func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha
 		schedulePods := r.filterEvictingPods(ctx, latestPool, pods, allocBeforeSchedule)
 
 		// 4. Schedule and allocate
-		podAllocation, pendingSyncs, idlePods, supplySandbox, poolDirty, err := r.scheduleSandbox(ctx, latestPool, batchSandboxes, schedulePods)
+		podAllocation, pendingSyncs, idlePods, dirtyPods, supplySandbox, poolDirty, err := r.scheduleSandbox(ctx, latestPool, batchSandboxes, schedulePods)
 		if err != nil {
 			return err
 		}
@@ -207,7 +207,7 @@ func (r *PoolReconciler) reconcilePool(ctx context.Context, pool *sandboxv1alpha
 		if err != nil {
 			return err
 		}
-		latestIdlePods, deleteOld, supplyNew := r.updatePool(ctx, latestRevision, schedulePods, idlePods)
+		latestIdlePods, deleteOld, supplyNew := r.updatePool(ctx, latestRevision, schedulePods, idlePods, dirtyPods)
 
 		args := &scaleArgs{
 			latestRevision: latestRevision,
@@ -327,7 +327,7 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alpha1.Pool, batchSandboxes []*sandboxv1alpha1.BatchSandbox, pods []*corev1.Pod) (map[string]string, []SandboxSyncInfo, []string, int32, bool, error) {
+func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alpha1.Pool, batchSandboxes []*sandboxv1alpha1.BatchSandbox, pods []*corev1.Pod) (map[string]string, []SandboxSyncInfo, []string, []string, int32, bool, error) {
 	log := logf.FromContext(ctx)
 	spec := &AllocSpec{
 		Sandboxes: batchSandboxes,
@@ -336,7 +336,7 @@ func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alp
 	}
 	status, pendingSyncs, poolDirty, err := r.Allocator.Schedule(ctx, spec)
 	if err != nil {
-		return nil, nil, nil, 0, false, err
+		return nil, nil, nil, nil, 0, false, err
 	}
 	idlePods := make([]string, 0)
 	for _, pod := range pods {
@@ -346,10 +346,10 @@ func (r *PoolReconciler) scheduleSandbox(ctx context.Context, pool *sandboxv1alp
 	}
 	log.Info("Schedule result", "pool", pool.Name, "allocated", len(status.PodAllocation),
 		"idlePods", len(idlePods), "supplement", status.PodSupplement, "pendingSyncs", len(pendingSyncs), "poolDirty", poolDirty)
-	return status.PodAllocation, pendingSyncs, idlePods, status.PodSupplement, poolDirty, nil
+	return status.PodAllocation, pendingSyncs, idlePods, status.DirtyPods, status.PodSupplement, poolDirty, nil
 }
 
-func (r *PoolReconciler) updatePool(ctx context.Context, latestRevision string, pods []*corev1.Pod, idlePods []string) ([]string, []string, int32) {
+func (r *PoolReconciler) updatePool(ctx context.Context, latestRevision string, pods []*corev1.Pod, idlePods []string, dirtyPods []string) ([]string, []string, int32) {
 	podMap := make(map[string]*corev1.Pod)
 	for _, pod := range pods {
 		podMap[pod.Name] = pod
@@ -358,7 +358,18 @@ func (r *PoolReconciler) updatePool(ctx context.Context, latestRevision string, 
 	deleteOld := make([]string, 0)
 	supplyNew := int32(0)
 
+	dirtySet := make(map[string]bool)
+	for _, p := range dirtyPods {
+		dirtySet[p] = true
+	}
+
 	for _, name := range idlePods {
+		if dirtySet[name] {
+			deleteOld = append(deleteOld, name)
+			// no need to supply, next reconcile will do this job
+			continue
+		}
+
 		pod, ok := podMap[name]
 		if !ok {
 			continue
