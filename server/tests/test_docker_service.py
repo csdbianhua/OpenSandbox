@@ -1204,6 +1204,7 @@ async def test_create_sandbox_windows_profile_injects_runtime_defaults(mock_dock
     assert "/dev/kvm" in host_config_kwargs["devices"]
     assert "/dev/net/tun" in host_config_kwargs["devices"]
     assert "NET_ADMIN" in host_config_kwargs["cap_add"]
+    assert "NET_RAW" in host_config_kwargs["cap_add"]
     assert any(bind.endswith(":/storage:rw") for bind in host_config_kwargs["binds"])
     assert any(bind.endswith(":/oem:rw") for bind in host_config_kwargs["binds"])
 

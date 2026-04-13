@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from opensandbox_server.api.schema import PlatformSpec
 
 WINDOWS_REQUIRED_DEVICES = ("/dev/kvm", "/dev/net/tun")
-WINDOWS_REQUIRED_CAP_ADD = ("NET_ADMIN",)
+WINDOWS_REQUIRED_CAP_ADD = ("NET_ADMIN", "NET_RAW")
 WINDOWS_EXECD_DOWNLOAD_URL_ENV = "EXECD_DOWNLOAD_URL"
 DEFAULT_WINDOWS_EXECD_RELEASE_TAG = "v1.0.11"
 DEFAULT_WINDOWS_EXECD_ARCH = "amd64"
@@ -186,7 +186,8 @@ def apply_windows_runtime_host_config_defaults(
     existing_devices.extend(WINDOWS_REQUIRED_DEVICES)
     updated["devices"] = existing_devices
 
-    cap_drop = [cap for cap in (updated.get("cap_drop") or []) if cap != "NET_ADMIN"]
+    required_caps = set(WINDOWS_REQUIRED_CAP_ADD)
+    cap_drop = [cap for cap in (updated.get("cap_drop") or []) if cap not in required_caps]
     if cap_drop:
         updated["cap_drop"] = cap_drop
     else:

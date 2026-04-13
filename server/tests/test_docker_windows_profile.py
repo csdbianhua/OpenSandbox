@@ -33,18 +33,20 @@ def test_apply_windows_runtime_host_config_defaults_injects_required_defaults():
 
     assert updated["devices"] == ["/dev/kvm", "/dev/net/tun"]
     assert "NET_ADMIN" in updated["cap_add"]
+    assert "NET_RAW" in updated["cap_add"]
     assert "opensandbox-win-storage-sbx-1:/storage:rw" in updated["binds"]
     assert "opensandbox-win-oem-sbx-1:/oem:rw" in updated["binds"]
 
 
 def test_apply_windows_runtime_host_config_defaults_removes_net_admin_from_cap_drop():
     host_cfg = {
-        "cap_drop": ["NET_ADMIN", "SYS_ADMIN"],
+        "cap_drop": ["NET_ADMIN", "NET_RAW", "SYS_ADMIN"],
         "binds": ["/tmp/data:/data:rw"],
     }
     updated = apply_windows_runtime_host_config_defaults(host_cfg, "sbx-2")
 
     assert "NET_ADMIN" not in (updated.get("cap_drop") or [])
+    assert "NET_RAW" not in (updated.get("cap_drop") or [])
     assert "SYS_ADMIN" in (updated.get("cap_drop") or [])
     assert "/tmp/data:/data:rw" in updated["binds"]
 
